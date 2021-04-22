@@ -1,0 +1,68 @@
+install_path: ./install
+symlink_path: ./bin
+cache_path: ./.cache
+cache_lifetime_sec: 600
+packages:
+  - slug: mvdan/sh
+    name: shfmt
+    asset_matcher: shfmt_*_linux_amd64
+    post_process:
+      - make_executeable
+      - link
+      - name: testrun
+        args:
+          - "-version"
+  - slug: restic/restic
+    asset_matcher: restic_*_linux_amd64.bz2
+    post_process:
+      - bz2
+      - make_executeable
+      - link
+      - name: testrun
+        args:
+          - version
+  - slug: DRiKE/uniload
+    asset_matcher: uniload
+    post_process:
+      - make_executeable
+      - link
+      - testrun
+  - slug: ericchiang/pup
+    asset_matcher: pup_*_linux_amd64.zip
+    post_process:
+      - name: unzip
+      - make_executeable
+      - link
+      - name: testrun
+        args:
+          - "--version"
+  - slug: eficode/wait-for
+    asset_matcher: wait-for
+    post_process:
+      - make_executeable
+      - link
+      - name: testrun
+        args:
+          - "--help"
+        quiet: true
+  - slug: hairyhenderson/gomplate
+    asset_matcher: gomplate_linux-amd64
+    post_process:
+      - make_executeable
+      - link
+      - name: testrun
+        args:
+          - "-v"
+  - slug: charmbracelet/glow
+    asset_matcher: glow_*_linux_x86_64.tar.gz
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: glow
+      - make_executeable
+      - link
+      - name: testrun
+        args:
+          - "-v"
+
+
