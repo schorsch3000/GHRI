@@ -133,6 +133,37 @@ function PP_tar(&$asset, $pp)
     die(1);
 }
 
+function PP_xz(&$asset, $pp)
+{
+    $pp['asset_matcher'] = isset($pp['asset_matcher']) ? $pp['asset_matcher'] : "/.*/";
+    ob_start();
+    system("2>&1 xz -d --force " . escapeshellarg($asset->name), $retval);
+    $fp = popen("find . -type f -not -name " . escapeshellarg($asset->name), 'r');
+
+    if (0 !== $retval) {
+        echo "error running unzip, status code is $retval\n";
+        die(1);
+    }
+    $newPossibleAssets = [];
+    while ($fp && !feof($fp)) {
+        $possibleAsset = substr(fgets($fp, 1024), 2, -1); // 2 removes ./ -1 removes newline
+        if (!strlen($possibleAsset)) continue;
+        $matcher = matcherPreparer($pp['asset_matcher']);
+        if (!$matcher($possibleAsset)) continue;
+        $newPossibleAssets[] = $possibleAsset;
+    }
+    if (1 == count($newPossibleAssets)) {
+        $asset->name = array_shift($newPossibleAssets);
+        return ob_get_clean();
+    }
+    if (count($newPossibleAssets)) {
+        echo "    there are multiple matching assets: " . implode(", ", $newPossibleAssets), "\n";
+    } else {
+        echo "    no matching asset found\n";
+    }
+    die(1);
+}
+
 function PP_bz2(&$asset)
 {
     ob_start();
@@ -156,6 +187,8 @@ function PP_gunzip(&$asset)
     }
     return ob_get_clean();
 }
+
+
 
 
 function matcherPreparer($matcher)
@@ -189,7 +222,7 @@ foreach ($config as $k => $v) {
 
 foreach ($config['packages'] as $package) {
     $package['name'] = isset($package['name']) ? $package['name'] : explode("/", $package['slug'])[1];
-    $package['post_process'] = $package['post_process'] ? $package['post_process'] : [];
+    $package['post_process'] = $package['post_process'] ?: [];
     if ($_SERVER['argc'] === 2 && $package['name'] !== $_SERVER['argv'][1]) continue;
     echo "Working on " . $package['name'] . "\n";
     chdir($config['install_path']);
