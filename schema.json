@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "install_path": {
+      "type": "string"
+    }
+  },
+  "required": "install_path"
+}

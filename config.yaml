@@ -1,13 +1,96 @@
 install_path: ./install
-symlink_path: ./bin
+symlink_path: /home/heilig/bin
 cache_path: ./.cache
 cache_lifetime_sec: 600
+global_post_process:
+  prepend:
+  append:
+    - check_in_path
+
+
 packages:
+  - slug: balena-io/etcher
+    desc: Image 'Burner'
+    name: etcher
+    asset_matcher: balenaEtcher-*-x64.AppImage
+    post_process:
+      - make_exec
+      - link
+
+  - slug: sharkdp/bat
+    name: batcat
+    desc: Better cat
+    asset_matcher: bat-*-x86_64-unknown-linux-gnu.tar.gz
+    post_process:
+     - name: tar
+       asset_matcher: "*/bat"
+     - link
+
+
+  - slug: MichaelMure/git-bug
+    desc: bug management via git
+    asset_matcher: git-bug_linux_amd64
+    post_process:
+      - make_exec
+      - link
+      - name: testrun
+        args: "--version"
+
+  - slug: wader/fq
+    desc: jq for binary files
+    asset_matcher: fq_*_linux_amd64.tar.gz
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: fq
+      - link
+      - name: testrun
+        args: "-v"
+  - slug: mgdm/htmlq
+    desc: jq for html
+    asset_matcher: "*-linux.tar.gz"
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: htmlq
+      - make_exec
+      - link
+      - name: testrun
+        args: "-V"
+
+  - slug: mike-engel/jwt-cli
+    name: jwt
+    asset_matcher: "*jwt-linux.tar.gz"
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: jwt
+      - link
+      - name: testrun
+        args: "-V"
+  - slug: p-gen/smenu
+    name: smenu
+    asset_matcher: "*linux-glibc*xz"
+    post_process:
+      - xz
+      - make_exec
+      - link
+      - name: testrun
+        args:
+         - "-V"
+  - slug: sayanarijit/xplr
+    name: xplr
+    asset_matcher: "*linux*tar.gz"
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: xplr
+      - link
   - slug: mvdan/sh
     name: shfmt
     asset_matcher: shfmt_*_linux_amd64
     post_process:
-      - make_executeable
+      - make_exec
       - link
       - name: testrun
         args:
@@ -16,7 +99,7 @@ packages:
     asset_matcher: restic_*_linux_amd64.bz2
     post_process:
       - bz2
-      - make_executeable
+      - make_exec
       - link
       - name: testrun
         args:
@@ -24,14 +107,14 @@ packages:
   - slug: DRiKE/uniload
     asset_matcher: uniload
     post_process:
-      - make_executeable
+      - make_exec
       - link
       - testrun
   - slug: ericchiang/pup
     asset_matcher: pup_*_linux_amd64.zip
     post_process:
       - name: unzip
-      - make_executeable
+      - make_exec
       - link
       - name: testrun
         args:
@@ -39,7 +122,7 @@ packages:
   - slug: eficode/wait-for
     asset_matcher: wait-for
     post_process:
-      - make_executeable
+      - make_exec
       - link
       - name: testrun
         args:
@@ -48,7 +131,7 @@ packages:
   - slug: hairyhenderson/gomplate
     asset_matcher: gomplate_linux-amd64
     post_process:
-      - make_executeable
+      - make_exec
       - link
       - name: testrun
         args:
@@ -59,10 +142,22 @@ packages:
       - gunzip
       - name: tar
         asset_matcher: glow
-      - make_executeable
+      - make_exec
       - link
       - name: testrun
         args:
           - "-v"
+  - slug: ClementTsang/bottom
+    name: btm
+    asset_matcher: bottom_x86_64*linux-gnu.tar.gz
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: btm
+      - make_exec
+      - link
+      - name: testrun
+        args: "-V"
+
 
 

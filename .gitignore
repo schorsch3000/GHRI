@@ -1,3 +1,6 @@
 install
-bin
 .cache
+vendor/
+box
+node_modules
+src/func.phpghri

@@ -1,0 +1,26 @@
+{
+    "name": "heilig/ghri",
+    "require": {
+        "kevinlebrun/colors.php": "^1.0",
+      "ext-json": "*",
+        "justinrainbow/json-schema": "^5.2",
+        "symfony/yaml": "^5.4"
+    },
+    "authors": [
+        {
+            "name": "Dirk Heilig",
+            "email": "heilig@adesso-mobile.de"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "GHRI\\": "./src/"
+        }
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^1.4",
+        "phpmd/phpmd": "^2.11"
+    },
+    "bin": ["ghri.php"]
+
+}
