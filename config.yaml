@@ -9,6 +9,14 @@ global_post_process:
 
 
 packages:
+  - slug: charmbracelet/soft-serve
+    desc: cli first git server
+    asset_matcher: soft-serve_*_linux_x86_64.tar.gz
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: soft
+      - link
   - slug: balena-io/etcher
     desc: Image 'Burner'
     name: etcher
