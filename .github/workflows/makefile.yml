@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: install deps
-      run: apt-get update && apt-get upgrade -y && apt-get install -y php-cli
+      run: sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y php-cli
     - name: make
       run: make release
       
