@@ -1,0 +1,30 @@
+name: Makefile CI
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: install deps
+      run: sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y php-cli && sudo npm install --global prettier @prettier/plugin-php
+
+    - name: make
+      run: make release
+
+    - name: release
+      uses: actions/creatr-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: New Release
+          draft: false
+          prerelease: false
