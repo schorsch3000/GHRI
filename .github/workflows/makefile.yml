@@ -1,0 +1,18 @@
+name: Makefile CI
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: install deps
+      run: apt-get update && apt-get upgrade -y && apt-get install -y php-cli
+    - name: make
+      run: make release
+      
