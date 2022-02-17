@@ -1,5 +1,8 @@
 .PHONY: check setup phpstan fix prettier prettier-check prettier-fix phpmd clean release
 
+export PATH := vendor/bin:node_modules/.bin:$(PATH)
+
+
 release: fix check clean box src/func.php
 	composer install --no-dev --optimize-autoloader
 	./box compile
