@@ -4,7 +4,7 @@ Download the latest release of a github repo, post-process it and symlink it to 
 
 ## how it works
 
-there is a config.yaml which contains some global configuration and package-config.
+there is a ghri.yaml which contains some global configuration and package-config.
 call `./ghri` to install all packages or `./ghri $packagename` to install a single package
 
 ## the config

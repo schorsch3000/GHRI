@@ -1,3 +1,4 @@
+---
 install_path: ./install
 symlink_path: /home/heilig/bin
 cache_path: ./.cache
@@ -9,6 +10,59 @@ global_post_process:
 
 
 packages:
+  - slug: obsidianmd/obsidian-releases
+    name: obsidian
+    asset_matcher: "*[0.9].AppImage"
+    post_process:
+      - make_exec
+      - link
+  - slug: sigoden/argc
+    asset_matcher: '*x86_64*linux*tar.gz'
+    post_process:
+      - tar
+      - link
+  - slug: neovim/neovim
+    name: nvim
+    asset_matcher: nvim.appimage
+    post_process:
+      - make_exec
+      - link
+  - slug: Ultimaker/Cura
+    name: cura
+    asset_matcher: /AppImage$/
+    post_process:
+      - make_exec
+      - link
+  - slug: tdewolff/minify
+    asset_matcher: minify_linux_amd64.tar.gz
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: minify
+      - link
+      - name: testrun
+        args:
+          - --version
+  - slug: caddyserver/caddy
+    asset_matcher: caddy_*_linux_amd64.tar.gz
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: caddy
+      - link
+      - name: testrun
+        args:
+          - version
+
+  - slug: cli/cli
+    name: gh
+    asset_matcher: gh_*_linux_amd64.deb
+    post_process:
+      - deb
+      - name: testrun
+        args:
+          - --version
+
   - slug: charmbracelet/soft-serve
     desc: cli first git server
     asset_matcher: soft-serve_*_linux_x86_64.tar.gz
@@ -18,7 +72,7 @@ packages:
         asset_matcher: soft
       - link
   - slug: balena-io/etcher
-    desc: Image 'Burner'
+    desc: Image Burner
     name: etcher
     asset_matcher: balenaEtcher-*-x64.AppImage
     post_process:
@@ -30,9 +84,9 @@ packages:
     desc: Better cat
     asset_matcher: bat-*-x86_64-unknown-linux-gnu.tar.gz
     post_process:
-     - name: tar
-       asset_matcher: "*/bat"
-     - link
+      - name: tar
+        asset_matcher: '*/bat'
+      - link
 
 
   - slug: MichaelMure/git-bug
@@ -42,7 +96,7 @@ packages:
       - make_exec
       - link
       - name: testrun
-        args: "--version"
+        args: --version
 
   - slug: wader/fq
     desc: jq for binary files
@@ -53,10 +107,10 @@ packages:
         asset_matcher: fq
       - link
       - name: testrun
-        args: "-v"
+        args: -v
   - slug: mgdm/htmlq
     desc: jq for html
-    asset_matcher: "*-linux.tar.gz"
+    asset_matcher: '*-linux.tar.gz'
     post_process:
       - gunzip
       - name: tar
@@ -64,31 +118,31 @@ packages:
       - make_exec
       - link
       - name: testrun
-        args: "-V"
+        args: -V
 
   - slug: mike-engel/jwt-cli
     name: jwt
-    asset_matcher: "*jwt-linux.tar.gz"
+    asset_matcher: '*jwt-linux.tar.gz'
     post_process:
       - gunzip
       - name: tar
         asset_matcher: jwt
       - link
       - name: testrun
-        args: "-V"
+        args: -V
   - slug: p-gen/smenu
     name: smenu
-    asset_matcher: "*linux-glibc*xz"
+    asset_matcher: '*linux-glibc*xz'
     post_process:
       - xz
       - make_exec
       - link
       - name: testrun
         args:
-         - "-V"
+          - -V
   - slug: sayanarijit/xplr
     name: xplr
-    asset_matcher: "*linux*tar.gz"
+    asset_matcher: '*linux*tar.gz'
     post_process:
       - gunzip
       - name: tar
@@ -102,7 +156,7 @@ packages:
       - link
       - name: testrun
         args:
-          - "-version"
+          - -version
   - slug: restic/restic
     asset_matcher: restic_*_linux_amd64.bz2
     post_process:
@@ -126,7 +180,7 @@ packages:
       - link
       - name: testrun
         args:
-          - "--version"
+          - --version
   - slug: eficode/wait-for
     asset_matcher: wait-for
     post_process:
@@ -134,7 +188,7 @@ packages:
       - link
       - name: testrun
         args:
-          - "--help"
+          - --help
         quiet: true
   - slug: hairyhenderson/gomplate
     asset_matcher: gomplate_linux-amd64
@@ -143,7 +197,7 @@ packages:
       - link
       - name: testrun
         args:
-          - "-v"
+          - -v
   - slug: charmbracelet/glow
     asset_matcher: glow_*_linux_x86_64.tar.gz
     post_process:
@@ -154,7 +208,7 @@ packages:
       - link
       - name: testrun
         args:
-          - "-v"
+          - -v
   - slug: ClementTsang/bottom
     name: btm
     asset_matcher: bottom_x86_64*linux-gnu.tar.gz
@@ -165,7 +219,4 @@ packages:
       - make_exec
       - link
       - name: testrun
-        args: "-V"
-
-
-
+        args: -V

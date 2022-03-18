@@ -14,10 +14,14 @@ class Testrun extends APostProcessor
         arrayDefault($this->postProcessor, 'quiet', false);
         arrayDefault($this->postProcessor, 'args', []);
         $command = (array) $this->postProcessor['args'];
+
         array_unshift(
             $command,
-            $this->config['symlink_path'] . '/' . $this->package['name']
+            isset($this->package['link'])
+                ? $this->config['symlink_path'] . '/' . $this->package['name']
+                : $this->package['name']
         );
+
         array_walk($command, function (&$value) {
             $value = escapeshellarg($value);
         });

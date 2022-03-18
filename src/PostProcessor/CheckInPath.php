@@ -13,6 +13,9 @@ class CheckInPath extends APostProcessor
 {
     public function process(GithubAsset &$asset)
     {
+        if (!isset($this->package['link'])) {
+            return true;
+        }
         $cmd = 'command -v ' . escapeshellarg($this->package['link']);
         exec($cmd, $output, $exitcode);
         if ($exitcode !== 0) {
@@ -23,6 +26,7 @@ class CheckInPath extends APostProcessor
             $this->infotext = join("\n", $output);
             return false;
         }
+
         if (realpath($output[0]) !== realpath($asset->getName())) {
             $this->infotext =
                 "$cmd gives us " .

@@ -34,7 +34,7 @@ prettier-fix: prettier
 		src/*.php \
 		src/**/*.php
 
-check: phpstan phpmd prettier-check
+check: phpstan prettier-check #phpmd
 
 
 prettier-check: prettier

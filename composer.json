@@ -4,7 +4,8 @@
         "kevinlebrun/colors.php": "^1.0",
       "ext-json": "*",
         "justinrainbow/json-schema": "^5.2",
-        "symfony/yaml": "^5.4"
+        "symfony/yaml": "^5.4",
+        "ext-yaml": "*"
     },
     "authors": [
         {
