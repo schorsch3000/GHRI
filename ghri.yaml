@@ -10,16 +10,87 @@ global_post_process:
 
 
 packages:
-  - slug: obsidianmd/obsidian-releases
-    name: obsidian
-    asset_matcher: "*[0.9].AppImage"
+  - slug: VICE-Team/svn-mirror
+    name: vice
+    asset_matcher: gtk3vice*deb
+    post_process:
+      - deb
+  - slug: yt-dlp/yt-dlp
+    name: yt-dlp
+    asset_matcher: yt-dlp_linux
     post_process:
       - make_exec
       - link
-  - slug: sigoden/argc
-    asset_matcher: '*x86_64*linux*tar.gz'
+      - name: testrun
+        args:
+          - --version
+  - slug: prusa3d/PrusaSlicer
+    name: prusa-slicer
+    asset_matcher: "*x64*GTK3*.AppImage"
     post_process:
-      - tar
+      - make_exec
+      - link
+
+#  - slug: snes2c64/gui
+#    name: snes2c64-gui
+#    asset_matcher: snes2c64-gui-linux-amd64
+#    post_process:
+#      - make_exec
+#      - link
+  - slug: arduino/arduino-cli
+    asset_matcher: "arduino-cli_*_Linux_64bit.tar.gz"
+    post_process:
+    - gunzip
+    - name: tar
+      asset_matcher: "arduino-cli"
+    - link
+  - slug: jesseduffield/lazygit
+    asset_matcher: "*Linux_x86_64.tar.gz"
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: 'lazygit'
+      - make_exec
+      - link
+
+  - slug: PaulJuliusMartinez/jless
+    asset_matcher: "*linux*zip"
+    post_process:
+      - unzip
+      - link
+  - slug: tomnomnom/gron
+    asset_matcher: '*linux-amd64*gz'
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: 'gron'
+      - make_exec
+      - link
+  - slug: exercism/cli
+    name: exercism
+    asset_matcher: '*linux-x86_64.tar.gz'
+    post_process:
+    - gunzip
+    - name: tar
+      asset_matcher: exercism
+    - link
+    - name: testrun
+      args:
+        - version
+  - slug: codesenberg/bombardier
+    asset_matcher: '*-linux-amd64'
+    post_process:
+      - make_exec
+      - link
+  - slug: wez/wezterm
+    asset_matcher: wezterm*Debian11.deb
+    post_process:
+      - deb
+  - slug: sjPlot/Relaunch64
+    name: relaunch64.jar
+    asset_matcher: '*Linux_jar.zip'
+    post_process:
+      - unzip
       - link
   - slug: neovim/neovim
     name: nvim
@@ -29,7 +100,7 @@ packages:
       - link
   - slug: Ultimaker/Cura
     name: cura
-    asset_matcher: /AppImage$/
+    asset_matcher: /linux-modern.AppImage/
     post_process:
       - make_exec
       - link
@@ -63,14 +134,6 @@ packages:
         args:
           - --version
 
-  - slug: charmbracelet/soft-serve
-    desc: cli first git server
-    asset_matcher: soft-serve_*_linux_x86_64.tar.gz
-    post_process:
-      - gunzip
-      - name: tar
-        asset_matcher: soft
-      - link
   - slug: balena-io/etcher
     desc: Image Burner
     name: etcher
@@ -80,7 +143,7 @@ packages:
       - link
 
   - slug: sharkdp/bat
-    name: batcat
+    name: bat
     desc: Better cat
     asset_matcher: bat-*-x86_64-unknown-linux-gnu.tar.gz
     post_process:
@@ -96,7 +159,7 @@ packages:
       - make_exec
       - link
       - name: testrun
-        args: --version
+        args: version
 
   - slug: wader/fq
     desc: jq for binary files
@@ -120,16 +183,6 @@ packages:
       - name: testrun
         args: -V
 
-  - slug: mike-engel/jwt-cli
-    name: jwt
-    asset_matcher: '*jwt-linux.tar.gz'
-    post_process:
-      - gunzip
-      - name: tar
-        asset_matcher: jwt
-      - link
-      - name: testrun
-        args: -V
   - slug: p-gen/smenu
     name: smenu
     asset_matcher: '*linux-glibc*xz'
@@ -199,16 +252,9 @@ packages:
         args:
           - -v
   - slug: charmbracelet/glow
-    asset_matcher: glow_*_linux_x86_64.tar.gz
+    asset_matcher: glow_*amd64.deb
     post_process:
-      - gunzip
-      - name: tar
-        asset_matcher: glow
-      - make_exec
-      - link
-      - name: testrun
-        args:
-          - -v
+      - deb
   - slug: ClementTsang/bottom
     name: btm
     asset_matcher: bottom_x86_64*linux-gnu.tar.gz
@@ -220,3 +266,12 @@ packages:
       - link
       - name: testrun
         args: -V
+  - slug: guptarohit/asciigraph
+    asset_matcher: asciigraph_*_Linux_x86_64.tar.gz
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: asciigraph
+      - make_exec
+      - link
+

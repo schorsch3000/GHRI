@@ -26,7 +26,7 @@ vendor: composer.json
 	touch vendor
 
 
-fix: prettier-fix
+fix: src/func.php prettier-fix
 
 prettier-fix: prettier
 	prettier -w --trailing-comma-php=all --single-quote=true \

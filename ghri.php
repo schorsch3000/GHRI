@@ -45,7 +45,7 @@ if ($_SERVER['argc'] === 1) {
             $installer->installPackages();
             break;
         default:
-            echo 'HALP';
+            help();
             break;
     }
 }
