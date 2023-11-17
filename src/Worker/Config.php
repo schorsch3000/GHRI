@@ -30,6 +30,8 @@ class Config
                 $package['name'] ?? explode('/', $package['slug'])[1];
             $names[$package['name']][] = $package['slug'];
             $package['post_process'] = $package['post_process'] ?? [];
+            $package['auto_install']= (bool)($package['auto_install'] ?? true);
+
         }
 
         $dblnames = array_filter($names, function ($name) {

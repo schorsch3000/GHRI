@@ -62,6 +62,10 @@ class InstallPackage
             ) {
                 continue;
             }
+            if(!count($this->packages) && !$package['auto_install']){
+                echo $color('Skipping ' . $package['name'].' since tis set to not autoinstall')->highlight->bold,"\n";
+                continue;
+            }
 
             echo $color('Working on ' . $package['name'])->header;
             if (isset($package['desc'])) {
