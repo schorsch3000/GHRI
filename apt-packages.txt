@@ -1,0 +1,29 @@
+# Debian packages for ghri and its development, one per line. Used by Dockerfile.az and `make deps`.
+# ghri runtime (REQUIRED_TOOLS / processor_tools in ghri.sh)
+yq-go
+gh
+jq
+git
+coreutils
+gawk
+sed
+grep
+findutils
+gzip
+bzip2
+xz-utils
+tar
+unzip
+dpkg
+sudo
+util-linux
+# development
+make
+shfmt
+shellcheck
+# dev environment extras
+curl
+zip
+nodejs
+zsh
+fish

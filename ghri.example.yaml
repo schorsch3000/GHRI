@@ -1,0 +1,73 @@
+# ghri.example.yaml: copy this to ghri.yaml (next to ghri.sh) and adjust it,
+# or let `ghri add owner/repo` write the entries for you.
+#
+# Paths are relative to the directory of ghri.sh unless they start with "/".
+
+install_path: ./install        # downloads: one directory per package and version
+symlink_path: ./bin            # binaries are linked here; put a directory that is on your PATH,
+                               # e.g. /home/you/bin (GHRI_SYMLINK_PATH overrides it per run)
+cache_path: ./.cache           # cached GitHub API responses
+state_path: ./.state           # which version of each package is installed
+cache_lifetime_sec: 600        # API responses younger than this are used without a request
+timeout_sec: 60                # limit for each GitHub API call
+download_timeout_sec: 900      # limit for each asset download
+
+# Steps that run for every package, before / after the package's own steps.
+global_post_process:
+  prepend: []
+  append:
+    - check_in_path            # fail unless the command can be found on PATH
+
+packages:
+  # A bare binary: make it executable, link it, run `viu --version` as a smoke test.
+  - slug: atanunq/viu
+    asset_matcher: viu-x86_64-unknown-linux-musl
+    post_process:
+      - make_exec
+      - link
+      - name: testrun
+        args: --version
+
+  # An archive: gunzip + tar, then take one file out of it. The asset_matcher of the
+  # tar step is a regex (between slashes) that matches the file with or without a
+  # leading directory. "*" in the top-level asset_matcher stands for the version.
+  - slug: sharkdp/fd
+    asset_matcher: fd-*-x86_64-unknown-linux-gnu.tar.gz
+    post_process:
+      - gunzip
+      - name: tar
+        asset_matcher: /(^|\/)fd$/
+      - make_exec
+      - link
+      - name: testrun
+        args: --version
+
+  # A different command name than the repository, and a pinned version
+  # (an exact tag, or a pattern such as "v1.*" for the newest matching release).
+  - slug: jqlang/jq
+    name: jq
+    version: "jq-1.*"
+    asset_matcher: jq-linux-amd64
+    post_process:
+      - make_exec
+      - link
+
+  # A Debian package (needs sudo). Remove it from this file with `ghri delete gh`;
+  # the installed package itself is removed with apt.
+  #- slug: cli/cli
+  #  name: gh
+  #  asset_matcher: gh_*_linux_amd64.deb
+  #  post_process:
+  #    - deb
+
+  # Skipped by `ghri install` unless named: `ghri install vice`
+  #- slug: owner/repo
+  #  name: vice
+  #  auto_install: false
+  #  prerelease: true          # consider pre-releases too
+  #  asset_matcher: "*.AppImage"
+  #  post_process: [make_exec, link]
+
+# Available steps: gunzip, bz2, xz (single files), tar, unzip (archives; asset_matcher picks
+# the file), make_exec, link, testrun (args: string or list, quiet: true hides the output),
+# check_in_path, deb.

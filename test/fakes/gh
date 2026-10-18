@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Fake `gh` for tests. Serves canned GitHub releases from $GHRI_FAKE_DIR:
+#   <owner>/<repo>/latest.json | list.json | tags/<tag>.json   (API bodies)
+#   <owner>/<repo>/assets/<tag>/<asset name>                    (downloadable files)
+#   rate_limited (flag file: every API call gets HTTP 403, rate limit exhausted)
+#   verify_fail  (flag file: `gh release verify-asset` fails)
+#   slow_api, slow_download (flag files holding a number of seconds: the call sleeps first)
+# Every invocation is appended to $GHRI_FAKE_DIR/calls.log.
+echo "$*" >>"$GHRI_FAKE_DIR/calls.log"
+
+case "$1 $2" in
+  "api -i")
+    shift 2
+    inm="" path=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        -H)
+          [[ "$2" == If-None-Match:* ]] && inm="${2#If-None-Match: }"
+          shift 2
+          ;;
+        *)
+          path="$1"
+          shift
+          ;;
+      esac
+    done
+    [[ -s "$GHRI_FAKE_DIR/slow_api" ]] && sleep "$(cat "$GHRI_FAKE_DIR/slow_api")"
+    if [[ -e "$GHRI_FAKE_DIR/rate_limited" ]]; then
+      printf 'HTTP/2.0 403 Forbidden\r\nX-Ratelimit-Remaining: 0\r\nX-Ratelimit-Reset: 4102444800\r\n\r\n{"message":"API rate limit exceeded"}\n'
+      echo "gh: API rate limit exceeded (HTTP 403)" >&2
+      exit 1
+    fi
+    path="${path%%\?*}" # ignore the query string
+    # /repos/<owner>/<repo>/releases[/latest|/tags/<tag>]
+    IFS=/ read -r _ _ owner repo _ kind tag <<<"$path"
+    base="$GHRI_FAKE_DIR/$owner/$repo"
+    case "$kind" in
+      latest) file="$base/latest.json" ;;
+      tags) file="$base/tags/$tag.json" ;;
+      "") file="$base/list.json" ;;
+      *) file="" ;;
+    esac
+    if [[ ! -f "$file" ]]; then
+      printf 'HTTP/2.0 404 Not Found\r\n\r\n{"message":"Not Found"}\n'
+      echo "gh: Not Found (HTTP 404)" >&2
+      exit 1
+    fi
+    etag="\"$(md5sum <"$file" | cut -c1-32)\""
+    if [[ "$inm" == "$etag" ]]; then
+      printf 'HTTP/2.0 304 Not Modified\r\nEtag: %s\r\n\r\n' "$etag"
+      exit 0
+    fi
+    printf 'HTTP/2.0 200 OK\r\nEtag: %s\r\nContent-Type: application/json\r\n\r\n' "$etag"
+    cat "$file"
+    ;;
+  "release download")
+    shift 2
+    tag="$1"
+    shift
+    slug="" pattern="" out=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        -R)
+          slug="$2"
+          shift 2
+          ;;
+        -p)
+          pattern="$2"
+          shift 2
+          ;;
+        -O)
+          out="$2"
+          shift 2
+          ;;
+        *) shift ;;
+      esac
+    done
+    name="${pattern//\\/}" # undo glob escaping
+    [[ -s "$GHRI_FAKE_DIR/slow_download" ]] && sleep "$(cat "$GHRI_FAKE_DIR/slow_download")"
+    src="$GHRI_FAKE_DIR/$slug/assets/$tag/$name"
+    if [[ ! -f "$src" ]]; then
+      echo "no assets match the file pattern" >&2
+      exit 1
+    fi
+    cp "$src" "$out"
+    ;;
+  "release verify-asset")
+    [[ -e "$GHRI_FAKE_DIR/verify_fail" ]] && {
+      echo "verification failed" >&2
+      exit 1
+    }
+    exit 0
+    ;;
+  *)
+    echo "fake gh: unsupported: $*" >&2
+    exit 64
+    ;;
+esac

@@ -1,0 +1,9 @@
+# personal configuration and secrets
+ghri.yaml
+ghri.yaml.bak
+.env
+
+# runtime data
+install/
+.cache/
+.state/
