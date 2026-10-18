@@ -7,3 +7,7 @@ ghri.yaml.bak
 install/
 .cache/
 .state/
+
+# editor and test leftovers
+.idea/
+home/
