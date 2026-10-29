@@ -6,17 +6,28 @@ source "$(dirname "${BASH_SOURCE[0]:-$0}")/helpers.sh"
 
 describe "Color system" do
   it "initializes color variables" do
+    C_RESET=""
     color_init
-    assert present "$C_RESET"
+    if tput setaf 0 >/dev/null 2>&1; then
+      assert present "$C_RESET"
+    else
+      # no usable terminfo (e.g. minimal CI container): colors stay empty by design
+      assert blank "$C_RESET"
+    fi
   end
 
   it "sets color escape sequences when tput works" do
+    C_RED="" C_YELLOW="" C_GREEN="" C_CYAN="" C_RESET=""
     color_init
-    assert present "$C_RED"
-    assert present "$C_YELLOW"
-    assert present "$C_GREEN"
-    assert present "$C_CYAN"
-    assert present "$C_RESET"
+    if tput setaf 0 >/dev/null 2>&1; then
+      assert present "$C_RED"
+      assert present "$C_YELLOW"
+      assert present "$C_GREEN"
+      assert present "$C_CYAN"
+      assert present "$C_RESET"
+    else
+      assert blank "$C_RED$C_YELLOW$C_GREEN$C_CYAN$C_RESET"
+    fi
   end
 
   it "provides helper functions" do
