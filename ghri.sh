@@ -14,7 +14,7 @@ ASSUME_YES=false       # -y: do not ask before --prune deletes
 OUTDATED_COUNT=0       # packages --outdated found not current (exit code 10)
 EXPLICIT_INSTALL=false # set by the `install` command; nothing is installed without it
 JSON=false             # --json: machine-readable --outdated
-VERSION="1.0.0"
+VERSION="1.1.0"
 gh_timeout=60        # timeout_sec: limit for each GitHub API call
 download_timeout=900 # download_timeout_sec: limit for each asset download
 TMP_DIR=""           # per-run temp dir (init_run)
@@ -206,46 +206,49 @@ load_config() {
     exit 1
   fi
 
-  install_path=$(yaml_field_default '.install_path' '"./install"')
-  cache_path=$(yaml_field_default '.cache_path' '"./.cache"')
-  state_path=$(yaml_field_default '.state_path' '"./.state"')
-  symlink_path=$(yaml_field_default '.symlink_path' '"./bin"')
+  # One jq call for all scalar settings (one line each), one for the global processors
+  local -a settings
+  mapfile -t settings < <(cfg_query '[.install_path // "./install", .cache_path // "./.cache", .state_path // "./.state",
+      .symlink_path // "./bin", .cache_lifetime_sec // "600", .timeout_sec // "60", .download_timeout_sec // "900"] | .[] | tostring')
+  install_path=$(clean_val "${settings[0]:-}")
+  cache_path=$(clean_val "${settings[1]:-}")
+  state_path=$(clean_val "${settings[2]:-}")
+  symlink_path=$(clean_val "${settings[3]:-}")
+  cache_lifetime=$(clean_val "${settings[4]:-}")
+  gh_timeout=$(clean_val "${settings[5]:-}")
+  download_timeout=$(clean_val "${settings[6]:-}")
 
-  # Resolve to absolute paths (handle already-absolute paths)
+  # Resolve to absolute paths (handle already-absolute paths), one realpath call for all
+  [[ -n "$install_path" ]] || install_path="./install"
+  [[ -n "$cache_path" ]] || cache_path="./.cache"
+  [[ -n "$state_path" ]] || state_path="./.state"
+  [[ -n "$symlink_path" ]] || symlink_path="./bin"
   [[ "$install_path" == /* ]] || install_path="$SCRIPT_DIR/$install_path"
-  install_path=$(realpath -m "$install_path")
   [[ "$cache_path" == /* ]] || cache_path="$SCRIPT_DIR/$cache_path"
-  cache_path=$(realpath -m "$cache_path")
   [[ "$state_path" == /* ]] || state_path="$SCRIPT_DIR/$state_path"
-  state_path=$(realpath -m "$state_path")
   [[ "$symlink_path" == /* ]] || symlink_path="$SCRIPT_DIR/$symlink_path"
-  symlink_path=$(realpath -m "$symlink_path")
-
   # Env var override for symlink_path
-  if [[ -n "${GHRI_SYMLINK_PATH:-}" ]]; then
-    symlink_path=$(realpath -m "$GHRI_SYMLINK_PATH")
-  fi
+  [[ -z "${GHRI_SYMLINK_PATH:-}" ]] || symlink_path="$GHRI_SYMLINK_PATH"
+  local -a resolved
+  mapfile -t resolved < <(realpath -m "$install_path" "$cache_path" "$state_path" "$symlink_path")
+  install_path="${resolved[0]}"
+  cache_path="${resolved[1]}"
+  state_path="${resolved[2]}"
+  symlink_path="${resolved[3]}"
 
-  cache_lifetime=$(yaml_field_default '.cache_lifetime_sec' '"600"')
   [[ -z "$cache_lifetime" ]] && cache_lifetime=600
-
-  gh_timeout=$(yaml_field_default '.timeout_sec' '"60"')
   [[ "$gh_timeout" =~ ^[0-9]+$ ]] || gh_timeout=60
-  download_timeout=$(yaml_field_default '.download_timeout_sec' '"900"')
   [[ "$download_timeout" =~ ^[0-9]+$ ]] || download_timeout=900
 
   # Global post-process prepend/append
   global_prepend=()
   global_append=()
 
-  local val
-  while IFS= read -r val; do
-    [[ -n "$val" ]] && global_prepend+=("$val")
-  done < <(cfg_query '.global_post_process.prepend // [] | .[]')
-
-  while IFS= read -r val; do
-    [[ -n "$val" ]] && global_append+=("$val")
-  done < <(cfg_query '.global_post_process.append // [] | .[]')
+  local kind val
+  while IFS=$'\t' read -r kind val; do
+    [[ -n "$val" ]] || continue
+    if [[ "$kind" == "p" ]]; then global_prepend+=("$val"); else global_append+=("$val"); fi
+  done < <(cfg_query '(.global_post_process.prepend // [] | .[] | "p\t\(.)"), (.global_post_process.append // [] | .[] | "a\t\(.)")')
 }
 
 # ─── Package Extraction ──────────────────────────────────────────────────────
@@ -282,6 +285,7 @@ get_pkg_auto_install() {
 get_pkg_prerelease() {
   local val
   val=$(yaml_field ".packages[$1].prerelease")
+  [[ -z "$val" ]] && val=$(yaml_field ".prerelease")
   [[ -z "$val" ]] && val="false"
   printf '%s' "$val"
 }
@@ -293,16 +297,38 @@ get_pkg_version() {
 
 # Read every field of package $1 with a single jq call.
 # Sets PKG_SLUG PKG_NAME PKG_PRERELEASE PKG_ASSET_MATCHER PKG_VERSION PKG_AUTO_INSTALL
+# shellcheck disable=SC2016  # $root is a jq variable
+PKG_JQ_FIELDS='[
+      (.slug // ""),
+      (.name // (.slug // "" | split("/") | last)),
+      (if .prerelease != null then .prerelease elif $root.prerelease != null then $root.prerelease else false end | tostring),
+      (.asset_matcher // "*"),
+      (.version // ""),
+      (if .auto_install == null then true else .auto_install end | tostring)
+    ] | join("\u001f")'
+_PKG_LINES=()
+_PKG_PRELOADED=false
+
+# Read the fields of every package with one jq call; load_package then needs no process of its
+# own until clear_package_preload. Loops over all packages (install, outdated) use this.
+preload_packages() {
+  load_config_json || true
+  mapfile -t _PKG_LINES < <(jq -r ". as \$root | .packages // [] | .[] | $PKG_JQ_FIELDS" <<<"$CONFIG_JSON" 2>/dev/null)
+  _PKG_PRELOADED=true
+}
+
+clear_package_preload() {
+  _PKG_LINES=()
+  _PKG_PRELOADED=false
+}
+
 load_package() {
   local line US=$'\x1f'
-  line=$(cfg_query ".packages[$1] | [
-      (.slug // \"\"),
-      (.name // (.slug // \"\" | split(\"/\") | last)),
-      (if .prerelease == null then false else .prerelease end | tostring),
-      (.asset_matcher // \"*\"),
-      (.version // \"\"),
-      (if .auto_install == null then true else .auto_install end | tostring)
-    ] | join(\"\\u001f\")")
+  if [[ "$_PKG_PRELOADED" == "true" && -n "${_PKG_LINES[$1]:-}" ]]; then
+    line="${_PKG_LINES[$1]}"
+  else
+    line=$(cfg_query ". as \$root | .packages[$1] | $PKG_JQ_FIELDS")
+  fi
   IFS="$US" read -r PKG_SLUG PKG_NAME PKG_PRERELEASE PKG_ASSET_MATCHER PKG_VERSION PKG_AUTO_INSTALL <<<"$line"
 }
 
@@ -577,32 +603,31 @@ pp_unzip() {
 
 # Convert slug to a directory name: owner/repo → owner_repo
 slug_to_dir() {
-  printf '%s' "$1" | tr '/' '_'
+  printf '%s' "${1//\//_}"
 }
 
 # Get the record path for a package
 state_file() {
-  printf '%s/%s/release.dat' "$state_path" "$(slug_to_dir "$1")"
+  printf '%s/%s/release.dat' "$state_path" "${1//\//_}"
 }
 
 # Where the record of a package was kept before state_path existed
 legacy_state_file() {
-  printf '%s/%s/release.dat' "$cache_path" "$(slug_to_dir "$1")"
+  printf '%s/%s/release.dat' "$cache_path" "${1//\//_}"
 }
 
 # Read the record into state_tag and state_prerelease; fails if the package is not recorded
 # shellcheck disable=SC2034  # state_prerelease is part of the record API
 state_read() {
-  local file legacy
-  file=$(state_file "$1")
-  legacy=$(legacy_state_file "$1")
+  local dir="${1//\//_}"
+  local file="$state_path/$dir/release.dat"
 
   state_tag=""
   state_prerelease=""
 
-  if [[ ! -f "$file" && -f "$legacy" ]]; then
-    mkdir -p "$(dirname "$file")" && mv "$legacy" "$file"
-    rmdir "$(dirname "$legacy")" 2>/dev/null
+  if [[ ! -f "$file" && -f "$cache_path/$dir/release.dat" ]]; then
+    mkdir -p "$state_path/$dir" && mv "$cache_path/$dir/release.dat" "$file"
+    rmdir "$cache_path/$dir" 2>/dev/null
   fi
   [[ -f "$file" ]] || return 1
 
@@ -681,19 +706,25 @@ acquire_lock() {
 # A fresh cache entry (younger than cache_lifetime) makes no request. A stale one is
 # revalidated with If-None-Match; a 304 does not count against the rate limit.
 # Prints the body on stdout; returns 1 on failure (reason reported via err).
+# True if a cached response for API path $1 is younger than cache_lifetime (and --no-cache is off)
+api_cache_fresh() {
+  local cache_json="$cache_path/api/${1//[^A-Za-z0-9._-]/_}.json"
+  [[ "$NO_CACHE" != "true" && -s "$cache_json" ]] || return 1
+  local mtime now
+  mtime=$(stat -c %Y "$cache_json" 2>/dev/null) || return 1
+  printf -v now '%(%s)T' -1
+  ((now - mtime < cache_lifetime))
+}
+
 api_get() {
   local path="$1"
   local cache_key="${path//[^A-Za-z0-9._-]/_}"
   local cache_json="$cache_path/api/$cache_key.json"
   local cache_etag="$cache_path/api/$cache_key.etag"
 
-  if [[ "$NO_CACHE" != "true" && -s "$cache_json" ]]; then
-    local age
-    age=$(($(date +%s) - $(stat -c %Y "$cache_json" 2>/dev/null || echo 0)))
-    if [[ $age -lt $cache_lifetime ]]; then
-      cat "$cache_json"
-      return 0
-    fi
+  if api_cache_fresh "$path"; then
+    cat "$cache_json"
+    return 0
   fi
 
   local args=(api -i -H "Accept: application/vnd.github+json")
@@ -751,6 +782,10 @@ api_get() {
 api_get_var() {
   local -n _api_out="$1"
   local tmp
+  if api_cache_fresh "$2"; then
+    _api_out=$(<"$cache_path/api/${2//[^A-Za-z0-9._-]/_}.json")
+    return 0
+  fi
   tmp=$(mktmp) || return 1
   if api_get "$2" >"$tmp"; then
     _api_out=$(<"$tmp")
@@ -791,15 +826,15 @@ fetch_release() {
     data=$(jq -c --arg t "$found" '.[] | select(.tag_name == $t)' <<<"$json" 2>/dev/null)
   elif [[ -n "$version" ]]; then
     api_get_var json "/repos/$slug/releases/tags/$version" || return 1
-    data=$(jq -c '.' <<<"$json" 2>/dev/null)
+    data="$json"
   elif [[ "$prerelease" == "true" ]]; then
     # Pre-release mode: get all releases, pick the latest by created_at
     api_get_var json "/repos/$slug/releases" || return 1
-    data=$(jq -c 'sort_by(.created_at) | last' <<<"$json" 2>/dev/null)
+    data=$(jq -c '[.[] | select(.draft | not)] | sort_by(.created_at) | last' <<<"$json" 2>/dev/null)
   else
     # Normal mode: latest release (excludes pre-releases)
     api_get_var json "/repos/$slug/releases/latest" || return 1
-    data=$(jq -c '.' <<<"$json" 2>/dev/null)
+    data="$json"
   fi
 
   if [[ -z "$data" || "$data" == "null" ]]; then
@@ -807,13 +842,21 @@ fetch_release() {
     return 1
   fi
 
-  release_tag=$(jq -r '.tag_name' <<<"$data" 2>/dev/null)
-  release_is_prerelease=$(jq -r '.prerelease' <<<"$data" 2>/dev/null)
-  release_immutable=$(jq -r '.immutable // false' <<<"$data" 2>/dev/null)
-
-  mapfile -t release_asset_names < <(jq -r '.assets[].name' <<<"$data" 2>/dev/null)
-  mapfile -t release_asset_urls < <(jq -r '.assets[].browser_download_url' <<<"$data" 2>/dev/null)
-  mapfile -t release_asset_digests < <(jq -r '.assets[] | .digest // ""' <<<"$data" 2>/dev/null)
+  # One jq call: tag, prerelease and immutable on the first three lines, then one
+  # name/url/digest line (unit separator) per asset
+  local lines line US=$'\x1f' name url digest
+  mapfile -t lines < <(jq -r '.tag_name, .prerelease, (.immutable // false),
+    (.assets[] | [.name, .browser_download_url, (.digest // "")] | join("\u001f"))' <<<"$data" 2>/dev/null)
+  release_tag="${lines[0]:-}"
+  release_is_prerelease="${lines[1]:-}"
+  release_immutable="${lines[2]:-false}"
+  release_asset_names=() release_asset_urls=() release_asset_digests=()
+  for line in "${lines[@]:3}"; do
+    IFS="$US" read -r name url digest <<<"$line"
+    release_asset_names+=("$name")
+    release_asset_urls+=("$url")
+    release_asset_digests+=("$digest")
+  done
   release_asset_count=${#release_asset_names[@]}
 
   if [[ -z "$release_tag" || "$release_tag" == "null" ]]; then
@@ -867,6 +910,7 @@ Usage: $(basename "$0") install [NAMES...]    Install/update all packages, or on
        $(basename "$0") add <owner/repo>      Interactive wizard: add a package to ghri.yaml
        $(basename "$0") edit <name>           Edit one package's part of ghri.yaml in \$EDITOR
        $(basename "$0") delete <name>         Remove a package from ghri.yaml (asks first; --yes skips)
+       $(basename "$0") list [-v]             List configured packages (-v: markdown with GitHub descriptions)
        $(basename "$0") [--outdated | --check | --prune]   Inspect or clean up (see options)
        $(basename "$0") completion <bash|zsh|fish>  Print a shell completion script
 
@@ -914,7 +958,7 @@ parse_args() {
   # takes any number of names (so packages called add, edit or delete can still be installed).
   local sub=""
   case "${1:-}" in
-    add | edit | install | completion) sub="$1" ;;
+    add | edit | install | completion | list) sub="$1" ;;
     delete | remove | rm) sub="delete" ;;
   esac
   [[ -n "$sub" ]] && shift
@@ -973,7 +1017,13 @@ parse_args() {
 
   [[ ${#TARGETS[@]} -gt 0 ]] && INSTALL_ALL=false
 
-  if [[ -n "$sub" && "$sub" != "install" ]]; then
+  if [[ "$sub" == "list" ]]; then
+    if [[ ${#TARGETS[@]} -ne 0 ]]; then
+      err "Usage: $(basename "$0") list [-v]"
+      exit 2
+    fi
+    MODE="list"
+  elif [[ -n "$sub" && "$sub" != "install" ]]; then
     if [[ ${#TARGETS[@]} -ne 1 ]]; then
       local what="name"
       [[ "$sub" == add ]] && what="owner/repo"
@@ -1006,12 +1056,11 @@ package_selected() {
 
 # Every package named on the command line must exist in the config
 check_targets() {
-  local t i count name found rc=0
-  count=$(get_pkg_count)
+  local t name found rc=0 names
+  mapfile -t names < <(cfg_query '.packages // [] | .[] | (.name // (.slug // "" | split("/") | last))')
   for t in "${TARGETS[@]}"; do
     found=false
-    for ((i = 0; i < count; i++)); do
-      name=$(get_pkg_name "$i")
+    for name in "${names[@]}"; do
       [[ "$name" == "$t" ]] && found=true
     done
     if [[ "$found" == "false" ]]; then
@@ -1043,7 +1092,8 @@ def processors($ctx):
   elif . == null then empty
   else "E:\($ctx): post_process must be a list" end;
 if type != "object" then "E:config root must be a mapping" else
-  (warn_unknown(["install_path", "symlink_path", "cache_path", "state_path", "cache_lifetime_sec", "timeout_sec", "download_timeout_sec", "global_post_process", "packages"]; "config")),
+  (warn_unknown(["install_path", "symlink_path", "cache_path", "state_path", "cache_lifetime_sec", "timeout_sec", "download_timeout_sec", "global_post_process", "prerelease", "packages"]; "config")),
+  (if (.prerelease != null) and ((.prerelease | type) != "boolean") then "E:prerelease must be true or false" else empty end),
   (["cache_lifetime_sec", "timeout_sec", "download_timeout_sec"][] as $k | if (.[$k] != null) and ((.[$k] | type) != "number") then "E:\($k) must be a number" else empty end),
   (if (.global_post_process | type) == "object" then
      (.global_post_process | warn_unknown(["prepend", "append"]; "global_post_process")),
@@ -1170,7 +1220,7 @@ is_up_to_date() {
   local slug="$1" name="$2"
   state_read "$slug" || return 1
   [[ "$state_tag" == "$release_tag" ]] || return 1
-  [[ -d "$install_path/$(slug_to_dir "$slug")/$release_tag" ]] || return 1
+  [[ -d "$install_path/${slug//\//_}/$release_tag" ]] || return 1
   [[ -e "$symlink_path/$name" ]] || command -v "$name" >/dev/null 2>&1
 }
 
@@ -1183,6 +1233,7 @@ do_outdated() {
   if [[ "$JSON" != "true" && "$QUIET" != "true" ]]; then
     printf '%-24s %-16s %-16s %s\n' "NAME" "INSTALLED" "LATEST" "STATUS"
   fi
+  preload_packages
   for ((i = 0; i < PKG_COUNT; i++)); do
     load_package "$i"
     local slug="$PKG_SLUG" name="$PKG_NAME" prerelease="$PKG_PRERELEASE" version="$PKG_VERSION"
@@ -1232,6 +1283,7 @@ do_outdated() {
       printf '%-24s %-16s %-16s %s\n' "$name" "$installed" "$latest" "$text"
     fi
   done
+  clear_package_preload
 
   if [[ "$JSON" == "true" ]]; then
     if [[ ${#rows[@]} -eq 0 ]]; then
@@ -1422,6 +1474,7 @@ do_install() {
   local n_installed=0 n_current=0 n_failed=0
   local start_dir="$PWD" log
 
+  preload_packages
   for ((i = 0; i < PKG_COUNT; i++)); do
     load_package "$i"
     local name="$PKG_NAME"
@@ -1453,6 +1506,7 @@ do_install() {
     esac
     rm -f "$log"
   done
+  clear_package_preload
 
   if [[ "$QUIET" != "true" || $((n_installed + n_failed)) -gt 0 ]]; then
     printf '\n%d installed, %d up to date, %d failed\n' "$n_installed" "$n_current" "$n_failed"
@@ -2032,6 +2086,57 @@ cmd_add() {
   fi
 }
 
+# ─── List ─────────────────────────────────────────────────────────────────────
+# `ghri list`: one line per package (name, slug). `list -v`: a markdown document with each
+# package's GitHub "About" text, shown through a markdown viewer when one is installed.
+do_list() {
+  local n i name slug
+  n=$(cfg_query '.packages // [] | length')
+  if [[ "$VERBOSE" != "true" ]]; then
+    for ((i = 0; i < n; i++)); do
+      load_package "$i"
+      printf '%-20s %s\n' "$PKG_NAME" "$PKG_SLUG"
+    done
+    return 0
+  fi
+
+  local doc="" json desc viewer
+  for ((i = 0; i < n; i++)); do
+    load_package "$i"
+    name="$PKG_NAME" slug="$PKG_SLUG"
+    desc=""
+    if api_get_var json "/repos/$slug"; then
+      desc=$(jq -r '.description // ""' <<<"$json" 2>/dev/null)
+    else
+      warn "No GitHub info for $slug: ${LAST_ERROR:-request failed}" >&2
+    fi
+    [[ -n "$desc" ]] || desc=$(cfg_query ".packages[$i].desc // \"\"")
+    [[ -n "$desc" ]] || desc="**No description.**"
+    doc+="# $slug \`$name\`"$'\n\n'"$desc"$'\n\n'
+  done
+
+  if [[ -t 1 ]]; then
+    for viewer in glow mdcat mdless; do
+      if command -v "$viewer" >/dev/null 2>&1; then
+        [[ "$viewer" == glow ]] && viewer="glow -"
+        $viewer <<<"$doc"
+        return 0
+      fi
+    done
+    for viewer in bat batcat; do
+      if command -v "$viewer" >/dev/null 2>&1; then
+        "$viewer" -l markdown --paging=never <<<"$doc"
+        return 0
+      fi
+    done
+  fi
+  # Plain markdown, paragraphs wrapped for readability
+  local line
+  while IFS= read -r line; do
+    if [[ "$line" == "#"* ]]; then printf '%s\n' "$line"; else fold -s -w 78 <<<"$line"; fi
+  done <<<"${doc%$'\n\n'}"
+}
+
 # ─── Shell Completion ─────────────────────────────────────────────────────────
 # `ghri completion bash|zsh|fish` prints a completion script. Package names come from
 # `ghri --names` (reads the config, no network).
@@ -2052,7 +2157,7 @@ completion_bash() {
 # bash completion for ghri; load with: source <(ghri completion bash)
 _ghri() {
   local cur="${COMP_WORDS[COMP_CWORD]}" first="${COMP_WORDS[1]:-}" cmd="${COMP_WORDS[0]}"
-  local commands="install add edit delete rm remove completion"
+  local commands="install add edit delete rm remove list completion"
   local opts="--outdated --list --dry-run --check --force --no-cache --refresh --quiet --verbose --prune --yes --json --version --help -o -l -n -c -f -r -q -v -y -h"
   local names
   COMPREPLY=()
@@ -2101,6 +2206,7 @@ _ghri() {
     'delete:remove a package from the config'
     'rm:remove a package from the config'
     'remove:remove a package from the config'
+    'list:list configured packages'
     'completion:print a shell completion script'
   )
   opts=(
@@ -2152,7 +2258,7 @@ function __ghri_names
 end
 
 for prog in ghri ghri.sh
-    set -l commands install add edit delete rm remove completion
+    set -l commands install add edit delete rm remove list completion
     complete -c $prog -f
     complete -c $prog -n "not __fish_seen_subcommand_from $commands" -a install -d "install or update packages"
     complete -c $prog -n "not __fish_seen_subcommand_from $commands" -a add -d "add a package with a wizard"
@@ -2160,6 +2266,7 @@ for prog in ghri ghri.sh
     complete -c $prog -n "not __fish_seen_subcommand_from $commands" -a delete -d "remove a package from the config"
     complete -c $prog -n "not __fish_seen_subcommand_from $commands" -a rm -d "remove a package from the config"
     complete -c $prog -n "not __fish_seen_subcommand_from $commands" -a remove -d "remove a package from the config"
+    complete -c $prog -n "not __fish_seen_subcommand_from $commands" -a list -d "list configured packages"
     complete -c $prog -n "not __fish_seen_subcommand_from $commands" -a completion -d "print a shell completion script"
     complete -c $prog -n "__fish_seen_subcommand_from install edit delete rm remove" -a "(__ghri_names)"
     complete -c $prog -n "__fish_seen_subcommand_from completion" -a "bash zsh fish"
@@ -2311,6 +2418,11 @@ main() {
   if [[ "$MODE" == "names" ]]; then
     cfg_query '.packages[]? | (.name // (.slug // "" | split("/") | last))'
     return 0
+  fi
+
+  if [[ "$MODE" == "list" ]]; then
+    do_list
+    return $?
   fi
 
   if [[ "$MODE" == "check" ]]; then

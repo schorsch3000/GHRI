@@ -161,6 +161,19 @@ EOF
     assert equal "$result" "false"
     teardown
   end
+
+  it "uses the global prerelease default, package value wins" do
+    setup
+    printf 'prerelease: true\npackages:\n  - slug: a/b\n  - slug: c/d\n    prerelease: false\n' > "$TEST_CONFIG"
+    CONFIG_FILE="$TEST_CONFIG"
+    _CONFIG_SIG=""
+    load_package 0
+    assert equal "$PKG_PRERELEASE" "true"
+    assert equal "$(get_pkg_prerelease 0)" "true"
+    load_package 1
+    assert equal "$PKG_PRERELEASE" "false"
+    teardown
+  end
 end
 
 describe "Post-processor extraction" do

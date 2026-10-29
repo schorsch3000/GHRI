@@ -22,11 +22,11 @@
 project:
   id: ghri-v2
 
-# The image the jail runs in. By default: Dockerfile.az next to this file if there is
-# one (`aicatraz init dockerfile` writes one), else a plain Debian.
+# The image the jail runs in. By default: Dockerfile.az next to this file (in .az/) if there is
+# one (`aicatraz init` writes one), else a plain Debian.
 # image: debian:13                 # an image to use as it is
 # image:                           # or a build
-#   dockerfile: Dockerfile.az
+#   dockerfile: .az/Dockerfile.az
 #   context: .
 
 # ╔════════════════════════════════════════════════════════════════════════╗
@@ -37,11 +37,11 @@ project:
 #   path:rw   read and write
 #   path:ro   read only
 #   path:hi   hidden: reads as empty (the path must exist, inside an rw/ro volume)
-# Paths starting with ./ or ../ are relative to this file, so the config works
+# Paths starting with ./ or ../ are relative to the project directory (the one holding .az/), so the config works
 # for everyone, wherever they check the project out. `~/x` and absolute paths work too.
 volumes:
   - .:rw
-  - ./aicatraz.yaml:rw  # this config: the agent can't read or change its own rules
+  - ./.az/aicatraz.yaml:hi   # this config: the agent can't read or change its own rules
   # - ./.env:hi                  # a secret the agent must not see
 
 # ╔════════════════════════════════════════════════════════════════════════╗
@@ -59,10 +59,9 @@ volumes:
 #   to      a host name, *.domain, an IPv4 address, a CIDR range, or *
 #   ports   22, 443, 8000-8080 and so on, or * (default: any port)
 #   proto   tcp (the default for names), udp, icmp (for addresses only)
-#network: off
-
+# With no rules, every connection is asked about. Add rules to let the usual ones through.
 network:
-  default: ask                  # or deny
+  default: ask                    # or deny
 #   dns: open                     # or restricted: only names a rule covers resolve
 #   resolvers: [1.1.1.1]          # default: this machine's
 #   rules:
@@ -111,7 +110,7 @@ network:
 
 # Passwordless sudo inside the jail. It loosens the jail: root in the container,
 # a writable root filesystem and some capabilities. See docs/security.md.
-sudo: true
+sudo: false
 
 # ╔════════════════════════════════════════════════════════════════════════╗
 # ║  THE DOOR TO YOUR MACHINE                                              ║
@@ -145,7 +144,9 @@ sudo: true
 
 # How long an `ask` prompt waits before it counts as a deny (5s to 1h).
 # approval:
-#   timeout: 2m
+#   timeout: 2m                  # counted from when the prompt is on your screen
+#   idle: 5s                     # a prompt waits (the bar blinks) until you have stopped typing this long; 0: at once
+#   guard: 500ms                 # a new prompt ignores keys for this long
 
 # What happens when a hidden path turns out to be visible (say, replaced on the host):
 # stop the session (default), warn once, or off.
@@ -164,10 +165,10 @@ sudo: true
 # ╚════════════════════════════════════════════════════════════════════════╝
 
 # The coding agent for `aicatraz agent`.
-agent:
-  tool: claude                   # or opencode
-  version: latest                # or a pinned version
-  skip_permissions: true         # the jail is the boundary, so the agent's own prompts are redundant
+# agent:
+#   tool: claude                   # or opencode
+#   version: latest                # or a pinned version
+#   skip_permissions: true         # the jail is the boundary, so the agent's own prompts are redundant
 
 # ╔════════════════════════════════════════════════════════════════════════╗
 # ║  LOOK                                                                  ║
@@ -178,6 +179,8 @@ agent:
 # `aicatraz bar-colors` shows the themes. A flag overrides this, and this overrides
 # your AICATRAZ_BAR_* variables.
 bar:
-  theme: lavender                 # a name from `aicatraz bar-colors`, or `random`
+  theme: github-dark               # a name from `aicatraz bar-colors`, or `random`
+#   symbol: "⚠️"                 # before the alert of a waiting prompt; "" for none
+#   symbol_width: 2              # columns your terminal draws it in (default: a guess)
 #   fg: white                    # text color: a name, 0-255, #rrggbb or default
 #   bg: "#102030"                # background; fg and bg override the theme's

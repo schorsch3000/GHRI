@@ -1,0 +1,47 @@
+bash
+coreutils
+findutils
+grep
+sed
+gawk
+diffutils
+patch
+ripgrep
+fd-find
+tree
+less
+jq
+curl
+wget
+ca-certificates
+tar
+gzip
+unzip
+xz-utils
+zip
+file
+xxd
+procps
+lsof
+git
+git-lfs
+build-essential
+pkg-config
+make
+python3
+python3-pip
+python3-venv
+pipx
+nodejs
+npm
+shellcheck
+locales-all
+tzdata
+
+#Optional add-ons
+#  cmake                      # C/C++ projects
+#  sqlite3 postgresql-client default-mysql-client redis-tools   # DB clients
+#  rsync netcat-openbsd dnsutils iputils-ping                   # network debug
+#  vim-tiny nano              # editor
+#  openjdk-21-jdk-headless maven gradle   # Java
+#  golang-go                  # Go

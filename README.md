@@ -117,6 +117,7 @@ symlink_path: /home/me/bin     # where binaries are linked; must be on PATH
 cache_path: ./.cache          # cached GitHub API responses (safe to delete)
 state_path: ./.state          # which version of each package is installed (keep this)
 cache_lifetime_sec: 600        # API responses younger than this are used without a request
+prerelease: false             # default for every package: true = newest release of any kind
 timeout_sec: 60                # limit for each GitHub API call
 download_timeout_sec: 900      # limit for each asset download
 global_post_process:
@@ -189,7 +190,7 @@ Name or slug both work for `edit` and `delete`. Changes are spliced into the fil
 | `asset_matcher` | `*` | glob, or `/regex/`, matched against the release's asset names; the first match wins |
 | `post_process` | none | steps to run, see below |
 | `auto_install` | `true` | `false`: skipped by `./ghri.sh install` without names, still installable by name |
-| `prerelease` | `false` | consider pre-releases |
+| `prerelease` | global `prerelease`, else `false` | `true`: always take the newest release of any kind (pre-release or not); overrides the global default |
 | `version` | latest | exact tag (`v1.2.3`), or a glob / `/regex/` such as `v1.*` for the newest matching release |
 | `desc` | | free text |
 
@@ -218,6 +219,29 @@ Steps run in order: `global_post_process.prepend`, the package's own list, then 
 `.deb` installs are system-wide and cannot be rolled back.
 
 `--force` and `--no-cache` are independent: `--force` reinstalls a package that is already at the latest version it knows, `--no-cache` makes sure "the latest version" is looked up on GitHub right now (a release published in the last `cache_lifetime_sec` seconds is otherwise not seen). Use both to reinstall the very latest: `./ghri.sh install --force --no-cache NAME`.
+
+## Using ghri in a Docker image (without curl or wget)
+
+Every release is also published as a `FROM scratch` image that contains only `ghri.sh` (at `/ghri.sh`) and `ghri.example.yaml`. It cannot run by itself; it exists so that `COPY --from` can bring ghri into any image, without `curl`, `wget` or a download step:
+
+```dockerfile
+FROM debian:13
+
+# ghri needs gh, yq and jq; all three are in Debian 13, apt needs no curl either
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates gh yq-go jq \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/schorsch3000/ghri:latest /ghri.sh /opt/ghri/ghri.sh
+COPY ghri.yaml /opt/ghri/ghri.yaml
+ENV PATH="/opt/ghri/bin:$PATH"
+
+# GITHUB_TOKEN raises the API rate limit; pass it as a build secret, it is not stored in the image
+RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN \
+    /opt/ghri/ghri.sh install
+```
+
+`ghri.yaml` is found next to the script, so it goes into `/opt/ghri/`; the default `symlink_path` (`./bin`) then is `/opt/ghri/bin`, which the `ENV` line puts on `PATH`. Pin the image to a version (`ghcr.io/schorsch3000/ghri:1.1.0`) for reproducible builds. Add the tools of the post-processors you use (`unzip`, `xz-utils`, ...) to the `apt-get install` line; `./ghri.sh --check` lists what is missing.
 
 ## Keeping things clean
 

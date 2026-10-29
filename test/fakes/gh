@@ -32,9 +32,11 @@ case "$1 $2" in
     fi
     path="${path%%\?*}" # ignore the query string
     # /repos/<owner>/<repo>/releases[/latest|/tags/<tag>]
-    IFS=/ read -r _ _ owner repo _ kind tag <<<"$path"
+    IFS=/ read -r _ _ owner repo section kind tag <<<"$path"
     base="$GHRI_FAKE_DIR/$owner/$repo"
+    [[ -z "$section" ]] && kind="repo"
     case "$kind" in
+      repo) file="$base/repo.json" ;;
       latest) file="$base/latest.json" ;;
       tags) file="$base/tags/$tag.json" ;;
       "") file="$base/list.json" ;;

@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [1.1.0] - 2026-10-29
+
+### Added
+- Top-level `prerelease` option: default for every package (a package's own `prerelease` wins).
+- Docker image `ghcr.io/schorsch3000/ghri` (`FROM scratch`, only `ghri.sh`) for `COPY --from`, published for every version tag; README section on using it without curl/wget.
+
+### Fixed
+- Pre-release mode no longer picks draft releases.
+
 ## [1.0.0] - 2026-10-18
 
 First release.

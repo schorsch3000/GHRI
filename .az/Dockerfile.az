@@ -1,0 +1,6 @@
+FROM prebake.home.shnbk.de/dev-shell:latest
+COPY --from=ghcr.io/schorsch3000/packagedealer:latest /usr/local/bin/pd /usr/local/bin/pd
+WORKDIR /etc/packagedealer/
+COPY ./.az/init/packages.apt ./az.apt
+COPY ./.az/init/packages.pipx ./az.pipx
+RUN pd --clean --update -D /etc/packagedealer/

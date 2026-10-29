@@ -9,6 +9,7 @@ symlink_path: ./bin            # binaries are linked here; put a directory that 
 cache_path: ./.cache           # cached GitHub API responses
 state_path: ./.state           # which version of each package is installed
 cache_lifetime_sec: 600        # API responses younger than this are used without a request
+prerelease: false             # default for every package: true = newest release of any kind
 timeout_sec: 60                # limit for each GitHub API call
 download_timeout_sec: 900      # limit for each asset download
 
