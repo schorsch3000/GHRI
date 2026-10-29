@@ -7,9 +7,15 @@ cd "$(dirname "$0")/.." || exit 1
 echo "=== GHRI Test Suite ==="
 echo ""
 
-# Runs every *_shpec.sh below the current directory. The deb integration test skips
-# itself unless GHRI_INTEGRATION=1.
-out=$(./shpec 2>&1 | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
+# CI containers have no TERM, which makes tput (and so the colour tests) fail
+export TERM="${TERM:-xterm}"
+
+# Runs every *_shpec.sh below test/. The deb integration test skips itself unless
+# GHRI_INTEGRATION=1. Absolute paths: shpec's own find yields relative ones, which
+# break once a test has changed directory (state_shpec.sh was "No such file").
+mapfile -t files < <(find "$PWD/test" -name '*_shpec.*')
+
+out=$(./shpec "${files[@]}" 2>&1 | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
 status=${PIPESTATUS[0]}
 printf '%s\n' "$out"
 
