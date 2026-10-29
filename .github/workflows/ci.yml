@@ -10,6 +10,10 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y make $(grep -vE '^(#|$)' apt-packages.txt)
+          # yq-go is not in stock Debian; the Go yq v4 binary is fetched below
+          apt-get install -y make ca-certificates $(grep -vE '^(#|$|yq-go$)' apt-packages.txt)
+          curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod 0755 /usr/local/bin/yq
+          yq --version
       - name: Lint, format check, tests, config check
         run: make ci
