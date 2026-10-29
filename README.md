@@ -241,7 +241,7 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN \
     /opt/ghri/ghri.sh install
 ```
 
-`ghri.yaml` is found next to the script, so it goes into `/opt/ghri/`; the default `symlink_path` (`./bin`) then is `/opt/ghri/bin`, which the `ENV` line puts on `PATH`. Pin the image to a version (`ghcr.io/schorsch3000/ghri:1.1.0`) for reproducible builds. Add the tools of the post-processors you use (`unzip`, `xz-utils`, ...) to the `apt-get install` line; `./ghri.sh --check` lists what is missing.
+`ghri.yaml` is found next to the script, so it goes into `/opt/ghri/`; the default `symlink_path` (`./bin`) then is `/opt/ghri/bin`, which the `ENV` line puts on `PATH`. Pin the image to a version (`ghcr.io/schorsch3000/ghri:0.1.0`) for reproducible builds. Add the tools of the post-processors you use (`unzip`, `xz-utils`, ...) to the `apt-get install` line; `./ghri.sh --check` lists what is missing.
 
 ## Keeping things clean
 
