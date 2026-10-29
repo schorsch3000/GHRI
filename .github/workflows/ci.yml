@@ -15,5 +15,7 @@ jobs:
           curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           chmod 0755 /usr/local/bin/yq
           yq --version
-      - name: Lint, format check, tests, config check
-        run: make ci
+      - name: Lint, format check, tests
+        run: make lint fmt-check test
+      - name: Config check (example config; ghri.yaml is personal and not in git)
+        run: cp ghri.example.yaml ghri.yaml && make check
